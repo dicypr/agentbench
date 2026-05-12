@@ -433,11 +433,12 @@ async function callGroq(messages, useTools=false){
     body.tool_choice = 'auto';
   }
 
-  const resp = await fetch('https://api.groqcloud.com/openai/v1/chat/completions',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
-    body:JSON.stringify(body)
-  });
+  const resp = await fetch('/api/chat',{
+  method:'POST',
+  headers:{'Content-Type':'application/json'},
+  body:JSON.stringify(body)
+  }); 
+  
   if(!resp.ok){
     const err = await resp.json().catch(()=>({error:{message:resp.statusText}}));
     throw new Error(err.error?.message||resp.statusText);
