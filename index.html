@@ -17,7 +17,6 @@
     --red:#ff4466;--red2:#cc2244;--red3:#330011;
     --blue:#4488ff;--blue2:#2266dd;--blue3:#001133;
     --purple:#aa66ff;--purple2:#8844cc;--purple3:#220033;
-    --cyan:#00ddff;
     --font-mono:'JetBrains Mono',monospace;
     --font-sans:'Space Grotesk',sans-serif;
     --radius:6px;--radius2:10px;
@@ -31,12 +30,12 @@
   .logo span{color:var(--text3)}
   .badge{font-family:var(--font-mono);font-size:10px;padding:3px 8px;border-radius:3px;border:1px solid var(--green3);color:var(--green2);background:var(--green3)}
   .badge.amber{border-color:var(--amber3);color:var(--amber);background:var(--amber3)}
-  .badge.red{border-color:var(--red3);color:var(--red);background:var(--red3)}
   .badge.blue{border-color:var(--blue3);color:var(--blue);background:var(--blue3)}
-  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-  .key-input{background:var(--bg3);border:1px solid var(--border2);border-radius:var(--radius);padding:6px 12px;color:var(--text);font-family:var(--font-mono);font-size:11px;width:220px;outline:none}
-  .key-input:focus{border-color:var(--green2)}
-  .key-input::placeholder{color:var(--text3)}
+  .badge.purple{border-color:var(--purple3);color:var(--purple);background:var(--purple3)}
+  .topbar-right{margin-left:auto;display:flex;align-items:center;gap:8px}
+  .status-dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 6px var(--green);animation:pulse 2s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+  .status-label{font-family:var(--font-mono);font-size:10px;color:var(--text3)}
 
   .main{display:grid;grid-template-columns:1fr 340px;overflow:hidden}
 
@@ -62,7 +61,6 @@
 
   .trajectory-area{flex:1;overflow-y:auto;padding:12px 16px;display:flex;flex-direction:column;gap:8px}
   .trajectory-area::-webkit-scrollbar{width:4px}
-  .trajectory-area::-webkit-scrollbar-track{background:transparent}
   .trajectory-area::-webkit-scrollbar-thumb{background:var(--border2);border-radius:2px}
 
   .step-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius2);overflow:hidden;transition:border-color .2s}
@@ -156,8 +154,10 @@
     <div class="badge">v1.0</div>
     <div class="badge amber">GROQ</div>
     <div class="badge blue">LLM-JUDGE</div>
+    <div class="badge purple">DPO</div>
     <div class="topbar-right">
-      <input class="key-input" type="password" id="apiKey" placeholder="sk-... Groq API Key"/>
+      <div class="status-dot"></div>
+      <span class="status-label">API READY</span>
     </div>
   </div>
 
@@ -165,7 +165,7 @@
     <div class="left">
       <div class="query-area">
         <div class="query-row">
-          <textarea class="query-input" id="queryInput" placeholder="Enter a task for the agent... e.g. 'Calculate 15% of 2847 then tell me if it is prime'" rows="3"></textarea>
+          <textarea class="query-input" id="queryInput" placeholder="Enter a task... e.g. 'Calculate 15% of 2847 then check if it is prime'&#10;Ctrl+Enter to run" rows="3"></textarea>
           <button class="run-btn" id="runBtn" onclick="runAgent()">&#9654; RUN<br/>AGENT</button>
         </div>
         <div class="presets" id="presets"></div>
@@ -196,7 +196,7 @@
       <div class="panel-header">
         <span class="panel-title">Eval Dashboard</span>
       </div>
-      <div class="right-top" id="rightPanel">
+      <div class="right-top">
         <div class="stat-grid">
           <div class="stat-card">
             <div class="stat-label">Avg Score</div>
@@ -224,7 +224,7 @@
         <div class="dpo-preview" id="dpoPreview">// No trajectories yet</div>
 
         <button class="export-btn" id="exportBtn" disabled onclick="exportDPO()">&#11015; Export DPO Dataset (JSONL)</button>
-        <button class="export-btn" id="clearBtn" style="margin-top:4px" onclick="clearAll()">&#10005; Clear All</button>
+        <button class="export-btn" style="margin-top:4px" onclick="clearAll()">&#10005; Clear All</button>
 
         <div class="section-label">Run History</div>
         <div id="historyList"></div>
@@ -249,7 +249,7 @@ const PRESETS = [
   "Calculate 15% of 2847, then check if the result rounded to nearest integer is prime",
   "What is 144 * 144? Is that number prime? Then reverse the string 'AGENTBENCH'",
   "Count words in 'The quick brown fox jumps over the lazy dog', then sort: banana,apple,cherry,date",
-  "What's today's date? Calculate days until Dec 31. Is 365 prime?",
+  "What's today's date? Is 365 prime?",
   "Encode 'Hello AgentBench' to base64, then count its characters",
 ];
 
@@ -263,7 +263,7 @@ function calcTool(args){
     const expr = args.expression||args.query||'';
     const clean = expr.replace(/[^0-9+\-*/().%\s]/g,'');
     const result = Function('"use strict";return('+clean+')')();
-    return {result:result,expression:expr};
+    return {result,expression:expr};
   }catch(e){return {error:'Invalid expression: '+e.message};}
 }
 function primeTool(args){
@@ -277,7 +277,7 @@ function searchTool(args){
   return{query:q,results:[
     {title:"Wikipedia: "+q,snippet:"Comprehensive article about "+q+" covering history, applications, and recent developments."},
     {title:q+" - Overview",snippet:"A detailed overview of "+q+" with examples and practical insights."},
-  ],note:"[Simulated search - connect real API for production]"};
+  ],note:"[Simulated search - connect SerpAPI for production]"};
 }
 function wordTool(args){
   const t = args.text||args.input||'';
@@ -288,7 +288,7 @@ function reverseTool(args){
   const s = args.string||args.text||'';
   return{original:s,reversed:s.split('').reverse().join('')};
 }
-function dateTool(args){
+function dateTool(){
   const now = new Date();
   return{date:now.toDateString(),time:now.toTimeString().slice(0,8),iso:now.toISOString(),day_of_week:['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'][now.getDay()],timestamp:now.getTime()};
 }
@@ -303,53 +303,53 @@ function b64Tool(args){
   catch(e){return{error:'Cannot encode: '+e.message};}
 }
 
-function executeTool(name, args){
-  const t = TOOLS.find(t=>t.name===name);
+function executeTool(name,args){
+  const t=TOOLS.find(t=>t.name===name);
   if(!t)return{error:'Unknown tool: '+name};
   usedTools.add(name);
   renderToolPills();
   return t.fn(args);
 }
 
-function addLog(msg, color='default'){
-  const el = document.getElementById('logScroll');
-  const now = new Date().toTimeString().slice(0,8);
-  const line = document.createElement('div');
-  line.className = 'log-line';
-  line.innerHTML = '<span class="log-time">'+now+'</span><span class="log-msg '+color+'">'+msg+'</span>';
+function addLog(msg,color='default'){
+  const el=document.getElementById('logScroll');
+  const now=new Date().toTimeString().slice(0,8);
+  const line=document.createElement('div');
+  line.className='log-line';
+  line.innerHTML='<span class="log-time">'+now+'</span><span class="log-msg '+color+'">'+escHtml(msg)+'</span>';
   el.appendChild(line);
-  el.scrollTop = el.scrollHeight;
+  el.scrollTop=el.scrollHeight;
 }
 
 function addStep(step){
   trajectory.push(step);
   renderStep(step);
-  document.getElementById('stepCount').textContent = trajectory.length+' steps';
-  document.getElementById('totalSteps').textContent = trajectory.filter(s=>!s.hidden).length;
-  document.getElementById('toolCalls').textContent = trajectory.filter(s=>s.type==='tool_call').length;
+  document.getElementById('stepCount').textContent=trajectory.length+' steps';
+  document.getElementById('totalSteps').textContent=trajectory.length;
+  document.getElementById('toolCalls').textContent=trajectory.filter(s=>s.type==='tool_call').length;
 }
 
 function renderStep(step){
-  const area = document.getElementById('trajectoryArea');
-  const empty = document.getElementById('emptyState');
+  const area=document.getElementById('trajectoryArea');
+  const empty=document.getElementById('emptyState');
   if(empty)empty.remove();
 
-  const card = document.createElement('div');
-  card.className = 'step-card '+step.type;
-  card.id = 'step-'+step.id;
+  const card=document.createElement('div');
+  card.className='step-card '+step.type;
+  card.id='step-'+step.id;
 
-  const icons = {thinking:'THINK',tool_call:'TOOL->',tool_result:'<-RES',answer:'DONE',error:'ERR'};
-  const scoreHtml = step.score!=null
-    ? '<span class="step-score '+(step.score>=7?'high':step.score>=4?'mid':'low')+'">'+step.score+'/10</span>'
-    : (step.type==='thinking'||step.type==='tool_call'?'<span class="spinner"></span>':'');
+  const icons={thinking:'THINK',tool_call:'TOOL->',tool_result:'<-RES',answer:'DONE',error:'ERR'};
+  const scoreHtml=step.score!=null
+    ?'<span class="step-score '+(step.score>=7?'high':step.score>=4?'mid':'low')+'">'+step.score+'/10</span>'
+    :(step.type==='thinking'||step.type==='tool_call'?'<span class="spinner"></span>':'');
 
-  const bodyText = typeof step.content === 'object' ? JSON.stringify(step.content,null,2) : step.content;
-  const shortLabel = step.label || (step.type==='tool_call'?step.tool_name:step.type);
+  const bodyText=typeof step.content==='object'?JSON.stringify(step.content,null,2):step.content;
+  const shortLabel=step.label||step.type;
 
-  card.innerHTML =
+  card.innerHTML=
     '<div class="step-header" onclick="toggleStep(\''+step.id+'\')">'+
       '<span class="step-icon '+step.type+'">'+(icons[step.type]||step.type)+'</span>'+
-      '<span class="step-label">'+shortLabel+'</span>'+
+      '<span class="step-label">'+escHtml(shortLabel)+'</span>'+
       scoreHtml+
       '<span class="step-toggle" id="tog-'+step.id+'">v</span>'+
     '</div>'+
@@ -357,38 +357,38 @@ function renderStep(step){
     (step.eval_comment?'<div class="eval-tag"><b>Judge:</b> '+escHtml(step.eval_comment)+'</div>':'');
 
   area.appendChild(card);
-  area.scrollTop = area.scrollHeight;
+  area.scrollTop=area.scrollHeight;
 }
 
 function toggleStep(id){
-  const b = document.getElementById('body-'+id);
-  const t = document.getElementById('tog-'+id);
+  const b=document.getElementById('body-'+id);
+  const t=document.getElementById('tog-'+id);
   b.classList.toggle('hidden');
-  t.textContent = b.classList.contains('hidden')?'v':'^';
+  t.textContent=b.classList.contains('hidden')?'v':'^';
 }
 
-function updateStep(id, updates){
-  const idx = trajectory.findIndex(s=>s.id===id);
+function updateStep(id,updates){
+  const idx=trajectory.findIndex(s=>s.id===id);
   if(idx>=0)Object.assign(trajectory[idx],updates);
-  const card = document.getElementById('step-'+id);
+  const card=document.getElementById('step-'+id);
   if(!card)return;
   if(updates.score!=null){
-    const sc = card.querySelector('.step-score, .spinner');
+    const sc=card.querySelector('.step-score, .spinner');
     if(sc){
-      const newEl = document.createElement('span');
-      newEl.className = 'step-score '+(updates.score>=7?'high':updates.score>=4?'mid':'low');
-      newEl.textContent = updates.score+'/10';
+      const newEl=document.createElement('span');
+      newEl.className='step-score '+(updates.score>=7?'high':updates.score>=4?'mid':'low');
+      newEl.textContent=updates.score+'/10';
       sc.replaceWith(newEl);
     }
   }
   if(updates.eval_comment){
-    let et = card.querySelector('.eval-tag');
+    let et=card.querySelector('.eval-tag');
     if(!et){et=document.createElement('div');et.className='eval-tag';card.appendChild(et);}
-    et.innerHTML = '<b>Judge:</b> '+escHtml(updates.eval_comment);
+    et.innerHTML='<b>Judge:</b> '+escHtml(updates.eval_comment);
   }
   if(updates.content){
-    const b = document.getElementById('body-'+id);
-    if(b)b.textContent = typeof updates.content==='object'?JSON.stringify(updates.content,null,2):updates.content;
+    const b=document.getElementById('body-'+id);
+    if(b)b.textContent=typeof updates.content==='object'?JSON.stringify(updates.content,null,2):updates.content;
   }
 }
 
@@ -396,11 +396,9 @@ function escHtml(s){
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
-async function callGroq(messages, useTools=false){
-  const key = document.getElementById('apiKey').value.trim();
-  if(!key)throw new Error('No API key - enter your Groq key in the top bar');
-
-  const toolDefs = useTools ? TOOLS.map(t=>({
+// All Groq calls go through /api/chat — key lives server-side only
+async function callGroq(messages,useTools=false){
+  const toolDefs=useTools?TOOLS.map(t=>({
     type:'function',
     function:{
       name:t.name,
@@ -408,9 +406,9 @@ async function callGroq(messages, useTools=false){
       parameters:{
         type:'object',
         properties:{
-          expression:{type:'string',description:'Math expression (for calculator)'},
-          number:{type:'string',description:'Number to check (for is_prime)'},
-          query:{type:'string',description:'Search query or general query'},
+          expression:{type:'string',description:'Math expression'},
+          number:{type:'string',description:'Number to check'},
+          query:{type:'string',description:'Search query'},
           text:{type:'string',description:'Text input'},
           string:{type:'string',description:'String input'},
           list:{type:'string',description:'Comma-separated list'},
@@ -421,185 +419,178 @@ async function callGroq(messages, useTools=false){
         }
       }
     }
-  })) : undefined;
+  })):undefined;
 
-  const body = {
+  const body={
     model:'llama-3.3-70b-versatile',
     max_tokens:1024,
-    messages:messages,
+    messages,
+    ...(useTools&&{tools:toolDefs,tool_choice:'auto'})
   };
-  if(useTools){
-    body.tools = toolDefs;
-    body.tool_choice = 'auto';
-  }
 
-  const resp = await fetch('/api/chat',{
-  method:'POST',
-  headers:{'Content-Type':'application/json'},
-  body:JSON.stringify(body)
-  }); 
-  
+  const resp=await fetch('/api/chat',{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  });
+
   if(!resp.ok){
-    const err = await resp.json().catch(()=>({error:{message:resp.statusText}}));
+    const err=await resp.json().catch(()=>({error:{message:resp.statusText}}));
     throw new Error(err.error?.message||resp.statusText);
   }
   return await resp.json();
 }
 
-async function judgeStep(query, stepType, content){
-  const key = document.getElementById('apiKey').value.trim();
-  if(!key)return{score:null,comment:'No key'};
+async function judgeStep(query,stepType,content){
   try{
-    const prompt = 'You are an expert LLM trajectory evaluator.\nTask: "'+query+'"\nStep type: '+stepType+'\nStep content: '+JSON.stringify(content).slice(0,600)+'\n\nScore this reasoning step from 1-10 on: relevance, correctness, and efficiency.\nReply ONLY with JSON: {"score": <1-10>, "comment": "<one sentence max>"}';
-    const resp = await callGroq([{role:'user',content:prompt}]);
-    const raw = resp.choices[0].message.content;
-    const clean = raw.replace(/```json|```/g,'').trim();
+    const prompt=
+      'You are an expert LLM trajectory evaluator.\n'+
+      'Task: "'+query+'"\n'+
+      'Step type: '+stepType+'\n'+
+      'Step content: '+JSON.stringify(content).slice(0,600)+'\n\n'+
+      'Score this reasoning step 1-10 on: relevance, correctness, and efficiency.\n'+
+      'Reply ONLY with JSON: {"score": <1-10>, "comment": "<one sentence>"}';
+    const resp=await callGroq([{role:'user',content:prompt}]);
+    const raw=resp.choices[0].message.content;
+    const clean=raw.replace(/```json|```/g,'').trim();
     return JSON.parse(clean);
-  }catch(e){return{score:5,comment:'Judge unavailable'};}
+  }catch(e){
+    return{score:5,comment:'Judge parse error'};
+  }
 }
 
-let stepCounter = 0;
+let stepCounter=0;
 function newId(){return 'step'+(++stepCounter);}
 
 async function runAgent(){
-  const query = document.getElementById('queryInput').value.trim();
-  if(!query)return;
-  if(isRunning)return;
-  const key = document.getElementById('apiKey').value.trim();
-  if(!key){addLog('ERROR: Enter Groq API key','red');return;}
+  const query=document.getElementById('queryInput').value.trim();
+  if(!query||isRunning)return;
 
-  isRunning = true;
-  trajectory = [];
+  isRunning=true;
+  trajectory=[];
   usedTools.clear();
-  document.getElementById('trajectoryArea').innerHTML = '';
-  document.getElementById('stepCount').textContent = '0 steps';
-  document.getElementById('runBtn').disabled = true;
-  document.getElementById('dpoPreview').textContent = '// Running...';
+  document.getElementById('trajectoryArea').innerHTML='';
+  document.getElementById('stepCount').textContent='0 steps';
+  document.getElementById('runBtn').disabled=true;
+  document.getElementById('dpoPreview').textContent='// Running...';
+  addLog('Agent started: '+query.slice(0,60)+'...','green');
 
-  addLog('Agent started: '+query.slice(0,50)+'...','green');
-
-  const messages = [
+  const messages=[
     {role:'system',content:'You are AgentBench, a powerful reasoning agent. Use the available tools to solve tasks step by step. Think carefully before each tool call. After getting results, reason about them before calling the next tool or providing your final answer. Always use tools when they can help.'},
     {role:'user',content:query}
   ];
 
-  let maxIter = 8;
-  let finalAnswer = null;
-
   try{
-    for(let iter=0;iter<maxIter;iter++){
-      addLog('Iteration '+(iter+1)+' - calling Groq...','blue');
+    for(let iter=0;iter<8;iter++){
+      addLog('Iteration '+(iter+1)+' — calling Groq...','blue');
 
-      const thinkId = newId();
+      const thinkId=newId();
       addStep({id:thinkId,type:'thinking',label:'Reasoning (turn '+(iter+1)+')',content:'...',score:null});
 
       let resp;
       try{
-        resp = await callGroq(messages, true);
+        resp=await callGroq(messages,true);
       }catch(e){
         addStep({id:newId(),type:'error',label:'API Error',content:e.message,score:null});
         addLog('ERROR: '+e.message,'red');
         break;
       }
 
-      const msg = resp.choices[0].message;
-      const thinkContent = msg.content||'(no internal monologue)';
+      const msg=resp.choices[0].message;
+      const thinkContent=msg.content||'(no reasoning output)';
       updateStep(thinkId,{content:thinkContent});
       addLog('Model responded','green');
 
-      const jRes = await judgeStep(query,'thinking',thinkContent);
+      const jRes=await judgeStep(query,'thinking',thinkContent);
       updateStep(thinkId,{score:jRes.score,eval_comment:jRes.comment});
-      addLog('Judge scored thinking: '+jRes.score+'/10','purple');
+      addLog('Judge: thinking scored '+jRes.score+'/10','purple');
 
       messages.push({role:'assistant',content:msg.content||null,tool_calls:msg.tool_calls||undefined});
 
-      if(msg.tool_calls && msg.tool_calls.length>0){
+      if(msg.tool_calls&&msg.tool_calls.length>0){
         for(const tc of msg.tool_calls){
-          const fn = tc.function;
-          let args = {};
+          const fn=tc.function;
+          let args={};
           try{args=JSON.parse(fn.arguments||'{}');}catch(e){}
 
-          const tcId = newId();
-          addStep({id:tcId,type:'tool_call',tool_name:fn.name,label:'-> '+fn.name+'('+JSON.stringify(args).slice(0,60)+')',content:JSON.stringify(args,null,2),score:null});
+          const tcId=newId();
+          addStep({id:tcId,type:'tool_call',tool_name:fn.name,label:'-> '+fn.name+'('+JSON.stringify(args).slice(0,50)+')',content:JSON.stringify(args,null,2),score:null});
           addLog('Tool call: '+fn.name,'blue');
 
-          const result = executeTool(fn.name, args);
-          const trId = newId();
+          const result=executeTool(fn.name,args);
+          const trId=newId();
           addStep({id:trId,type:'tool_result',label:'<- '+fn.name+' result',content:result,score:null});
-          addLog('Tool result: '+JSON.stringify(result).slice(0,80),'purple');
+          addLog('Tool result received','purple');
 
-          const jTc = await judgeStep(query,'tool_call',{tool:fn.name,args:args,result:result});
+          const jTc=await judgeStep(query,'tool_call',{tool:fn.name,args,result});
           updateStep(tcId,{score:jTc.score,eval_comment:jTc.comment});
 
           messages.push({role:'tool',tool_call_id:tc.id,content:JSON.stringify(result)});
         }
-      } else {
-        finalAnswer = msg.content;
-        const ansId = newId();
-        addStep({id:ansId,type:'answer',label:'Final Answer',content:finalAnswer,score:null});
-        const jAns = await judgeStep(query,'final_answer',finalAnswer);
+      }else{
+        const ansId=newId();
+        addStep({id:ansId,type:'answer',label:'Final Answer',content:msg.content,score:null});
+        const jAns=await judgeStep(query,'final_answer',msg.content);
         updateStep(ansId,{score:jAns.score,eval_comment:jAns.comment});
-        addLog('Agent finished','green');
+        addLog('Agent finished successfully','green');
         break;
       }
     }
   }finally{
-    isRunning = false;
-    document.getElementById('runBtn').disabled = false;
+    isRunning=false;
+    document.getElementById('runBtn').disabled=false;
     finalizeRun(query);
   }
 }
 
 function finalizeRun(query){
-  const scores = trajectory.filter(s=>s.score!=null).map(s=>s.score);
-  const avg = scores.length ? (scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1) : '-';
-  document.getElementById('avgScore').textContent = avg;
-  const pct = avg!='-' ? ((parseFloat(avg)/10)*100) : 0;
-  document.getElementById('avgBar').style.width = pct+'%';
-  document.getElementById('avgBar').style.background = pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
-  document.getElementById('totalRuns').textContent = allRuns.length+1;
+  const scores=trajectory.filter(s=>s.score!=null).map(s=>s.score);
+  const avg=scores.length?(scores.reduce((a,b)=>a+b,0)/scores.length).toFixed(1):'-';
+  document.getElementById('avgScore').textContent=avg;
+  const pct=avg!=='-'?(parseFloat(avg)/10)*100:0;
+  document.getElementById('avgBar').style.width=pct+'%';
+  document.getElementById('avgBar').style.background=pct>=70?'var(--green)':pct>=40?'var(--amber)':'var(--red)';
 
-  const run = {id:Date.now(),query:query,trajectory:[...trajectory],avg_score:avg,tool_count:trajectory.filter(s=>s.type==='tool_call').length};
+  const run={id:Date.now(),query,trajectory:[...trajectory],avg_score:avg,tool_count:trajectory.filter(s=>s.type==='tool_call').length};
   allRuns.push(run);
-  document.getElementById('exportBtn').disabled = false;
+  document.getElementById('totalRuns').textContent=allRuns.length;
+  document.getElementById('exportBtn').disabled=false;
 
   buildDPOPreview();
   renderHistory();
   renderToolPills();
-  addLog('Run complete. Avg judge score: '+avg+'/10','green');
+  addLog('Run complete. Avg score: '+avg+'/10','green');
 }
 
 function buildDPOPreview(){
   if(!allRuns.length){document.getElementById('dpoPreview').textContent='// No trajectories yet';return;}
-  const run = allRuns[allRuns.length-1];
-  const dpo = {
+  const run=allRuns[allRuns.length-1];
+  const dpo={
     prompt:run.query,
     chosen:run.trajectory.filter(s=>s.score>=7).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
     rejected:run.trajectory.filter(s=>s.score!=null&&s.score<5).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
     avg_score:run.avg_score
   };
-  document.getElementById('dpoPreview').textContent = JSON.stringify(dpo,null,2).slice(0,800)+'...';
+  document.getElementById('dpoPreview').textContent=JSON.stringify(dpo,null,2).slice(0,800)+'...';
 }
 
 function exportDPO(){
   if(!allRuns.length)return;
-  const lines = allRuns.map(run=>{
-    return JSON.stringify({
-      prompt:run.query,
-      chosen:run.trajectory.filter(s=>s.score>=7).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
-      rejected:run.trajectory.filter(s=>s.score!=null&&s.score<5).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
-      all_steps:run.trajectory.map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score,eval_comment:s.eval_comment})),
-      avg_score:run.avg_score,
-      tool_calls:run.tool_count,
-      timestamp:run.id
-    });
-  });
-  const blob = new Blob([lines.join('\n')],{type:'application/jsonl'});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
+  const lines=allRuns.map(run=>JSON.stringify({
+    prompt:run.query,
+    chosen:run.trajectory.filter(s=>s.score>=7).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
+    rejected:run.trajectory.filter(s=>s.score!=null&&s.score<5).map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score})),
+    all_steps:run.trajectory.map(s=>({type:s.type,content:typeof s.content==='object'?JSON.stringify(s.content):s.content,score:s.score,eval_comment:s.eval_comment})),
+    avg_score:run.avg_score,
+    tool_calls:run.tool_count,
+    timestamp:run.id
+  }));
+  const blob=new Blob([lines.join('\n')],{type:'application/jsonl'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
   a.href=url;a.download='agentbench_dpo_dataset.jsonl';
   a.click();URL.revokeObjectURL(url);
-  addLog('DPO dataset exported: '+allRuns.length+' runs','green');
+  addLog('Exported '+allRuns.length+' runs as JSONL','green');
 }
 
 function clearAll(){
@@ -620,17 +611,17 @@ function clearAll(){
 }
 
 function renderHistory(){
-  const el = document.getElementById('historyList');
-  el.innerHTML = allRuns.slice().reverse().slice(0,5).map(r=>
+  const el=document.getElementById('historyList');
+  el.innerHTML=allRuns.slice().reverse().slice(0,5).map(r=>
     '<div class="history-item" onclick="loadRun('+r.id+')">'+
       '<div class="history-q">'+escHtml(r.query)+'</div>'+
-      '<div class="history-meta">score: '+r.avg_score+'/10 - '+r.tool_count+' tools - '+r.trajectory.length+' steps</div>'+
+      '<div class="history-meta">score: '+r.avg_score+'/10 &middot; '+r.tool_count+' tools &middot; '+r.trajectory.length+' steps</div>'+
     '</div>'
   ).join('');
 }
 
 function loadRun(id){
-  const run = allRuns.find(r=>r.id===id);
+  const run=allRuns.find(r=>r.id===id);
   if(!run)return;
   trajectory=[...run.trajectory];
   usedTools.clear();
@@ -646,22 +637,30 @@ function loadRun(id){
   addLog('Loaded run: '+run.query.slice(0,40),'blue');
 }
 
-function initPresets(){
-  const el = document.getElementById('presets');
-  el.innerHTML = PRESETS.map((p,i)=>'<button class="preset-btn" onclick="setPreset('+i+')">preset '+(i+1)+'</button>').join('');
-}
-function setPreset(i){
-  document.getElementById('queryInput').value = PRESETS[i];
+function renderToolPills(){
+  document.getElementById('toolPills').innerHTML=TOOLS.map(t=>
+    '<div class="tool-pill '+(usedTools.has(t.name)?'used':'')+'">'+t.name+'</div>'
+  ).join('');
 }
 
-document.getElementById('queryInput').addEventListener('keydown',function(e){
-  if(e.key==='Enter'&&e.ctrlKey){runAgent();}
+function initPresets(){
+  document.getElementById('presets').innerHTML=PRESETS.map((p,i)=>
+    '<button class="preset-btn" onclick="setPreset('+i+')">preset '+(i+1)+'</button>'
+  ).join('');
+}
+
+function setPreset(i){
+  document.getElementById('queryInput').value=PRESETS[i];
+}
+
+document.getElementById('queryInput').addEventListener('keydown',e=>{
+  if(e.key==='Enter'&&e.ctrlKey)runAgent();
 });
 
 initPresets();
 renderToolPills();
-addLog('AgentBench initialized','green');
-addLog('Enter Groq API key + task to begin','default');
+addLog('AgentBench initialized — proxy mode active','green');
+addLog('Groq key secured server-side via /api/chat','default');
 </script>
 </body>
 </html>
